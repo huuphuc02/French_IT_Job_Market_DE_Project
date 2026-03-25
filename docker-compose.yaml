@@ -125,6 +125,32 @@ services:
         condition: service_healthy
     restart: always
 
+  # ── Producer ──────────────────────────────────────────────────────────────
+
+  # One-shot backfill: run with `docker compose --profile backfill up producer`
+  # Will not start during normal `docker compose up -d`
+  producer:
+    image: python:3.12-slim
+    working_dir: /app
+    volumes:
+      - ./src:/app/src
+      - ./requirements.txt:/app/requirements.txt
+      - ./.env:/app/.env
+    environment:
+      KAFKA_BOOTSTRAP: kafka:9092
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    command: >
+      bash -c "pip install -r requirements.txt -q &&
+               PYTHONPATH=src python -m producer.backfill"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    profiles:
+      - backfill
+
   # ── Orchestration ──────────────────────────────────────────────────────────
 
   # One-shot: initialises Airflow DB and creates admin user
