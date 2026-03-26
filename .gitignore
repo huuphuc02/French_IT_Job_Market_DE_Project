@@ -1,3 +1,5 @@
 .env
 .DS_Store
 airflow/logs/
+venv/
+src/producer/__pycache__/

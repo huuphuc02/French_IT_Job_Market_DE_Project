@@ -34,3 +34,19 @@ def publish_offer(producer: Producer, offer: dict):
     )
     # Non-blocking; flush happens in batches / at the end
     producer.poll(0)
+
+def publish_event(producer: Producer, topic: str, event_type: str, offer_id: str, offer: dict | None):
+    """Publish a CDC event. `offer` is the full offer dict for INSERT/UPDATE, None for EXPIRE."""
+    event = {
+        "event_type":      event_type,
+        "event_timestamp": datetime.now(timezone.utc).isoformat(),
+        "offer_id":        offer_id,
+        "offer":           offer,       # full dict for INSERT/UPDATE; null for EXPIRE
+    }
+    producer.produce(
+        topic=topic,
+        key=offer_id.encode(),
+        value=json.dumps(event, ensure_ascii=False).encode(),
+        callback=delivery_report,
+    )
+    producer.poll(0)

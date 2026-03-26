@@ -9,13 +9,16 @@ FT_CLIENT_ID = os.getenv("FT_CLIENT_ID")
 FT_CLIENT_SECRET = os.getenv("FT_CLIENT_SECRET")
 FT_SCOPE = os.getenv("FT_SCOPE", "api_offresdemploiv2 o2dsoffre")
 
-KAFKA_BOOTSTRAP = "kafka:9092"
-KAFKA_TOPIC_BACKFILL = 'it-job-offers-backfill'
+# localhost:29092 when running on host Mac; kafka:9092 when inside Docker
+KAFKA_BOOTSTRAP    = os.getenv("KAFKA_BOOTSTRAP", "localhost:29092")
+KAFKA_TOPIC_BACKFILL = "it-job-offers-backfill"
+KAFKA_TOPIC_CDC      = "it-job-offers-cdc"
 
-REDIS_HOST = "redis"
-REDIS_PORT = 6379
-REDIS_DB = 0
-REDIS_PASSWORD = None
+# localhost when running on host Mac; "redis" when inside Docker
+REDIS_HOST     = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT     = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_DB       = int(os.getenv("REDIS_DB", "0"))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 
 ROME_CODES = [
     "M1801", # Administrateur / Administratrice réseau informatique
