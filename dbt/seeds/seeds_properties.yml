@@ -1,0 +1,12 @@
+seeds:
+  - name: dept_region
+    columns:
+      - name: dept_code
+        description: Numeric code for departement
+        data_tests:
+          - unique
+          - not_null
+      - name: dept_name
+      - name: region_code
+      - name: region_name
+      - name: is_overseas
