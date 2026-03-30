@@ -1,0 +1,68 @@
+from pyspark.sql.types import *
+
+KAFKA_EVENT_SCHEMA = StructType([
+    StructField("event_type", StringType()),
+    StructField("event_timestamp", StringType()),
+    StructField("offer_id", StringType()),
+    StructField("offer", StructType([
+        StructField("id", StringType()),
+        StructField("intitule", StringType()),
+        StructField("description", StringType()),
+        StructField("dateCreation", StringType()),
+        StructField("dateActualisation", StringType()),
+        StructField("lieuTravail", StructType([
+            StructField("libelle", StringType()),
+            StructField("latitude", FloatType()),
+            StructField("longitude", FloatType()),
+            StructField("codePostal", StringType()),
+            StructField("commune", StringType()),
+        ])),
+        StructField("romeCode", StringType()),
+        StructField("romeLibelle", StringType()),
+        StructField("appellationlibelle", StringType()),
+        StructField("entreprise", StructType([
+            StructField("nom", StringType()),
+            StructField("entrepriseAdaptee", BooleanType()),
+        ])),
+        StructField("typeContrat", StringType()),
+        StructField("typeContratLibelle", StringType()),
+        StructField("natureContrat", StringType()),
+        StructField("experienceExige", StringType()),
+        StructField("experienceLibelle", StringType()),
+        StructField("formations", ArrayType(StructType([
+            StructField("codeFormation", StringType()),
+            StructField("domaineLibelle", StringType()),
+            StructField("niveauLibelle", StringType()),
+            StructField("exigence", StringType()),
+        ]))),
+        StructField("competences", ArrayType(StructType([
+            StructField("code", StringType()),
+            StructField("libelle", StringType()),
+            StructField("exigence", StringType()),
+        ]))),
+        StructField("salaire", StructType([
+            StructField("libelle", StringType()),
+            StructField("complement1", StringType()),
+            StructField("complement2", StringType()),
+            StructField("listeComplements", ArrayType(StructType([
+                StructField("code", StringType()),
+                StructField("libelle", StringType()),
+            ]))),
+        ])),
+        StructField("dureeTravailLibelle", StringType()),
+        StructField("dureeTravailLibelleConverti", StringType()),
+        StructField("alternance", BooleanType()),
+        StructField("nombrePostes", IntegerType()),
+        StructField("accessibleTH", BooleanType()),
+        StructField("deplacementCode", StringType()),
+        StructField("deplacementLibelle", StringType()),
+        StructField("qualificationCode", StringType()),
+        StructField("qualificationLibelle", StringType()),
+        StructField("codeNAF", StringType()),
+        StructField("secteurActivite", StringType()),
+        StructField("secteurActiviteLibelle", StringType()),
+        StructField("trancheEffectifEtab", StringType()),
+        StructField("offresManqueCandidats", BooleanType()),
+        StructField("employeurHandiEngage", BooleanType()),
+    ]))
+])

@@ -16,7 +16,7 @@ x-airflow-common: &airflow-common
     - ./airflow/logs:/opt/airflow/logs
     - ./airflow/plugins:/opt/airflow/plugins
     - ./src:/opt/airflow/src
-    - ./terraform/keys/mycreds.json:/opt/airflow/keys/mycreds.json:ro
+    - ./terraform/keys:/opt/airflow/keys:ro
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     postgres:
@@ -108,21 +108,60 @@ services:
       retries: 5
     restart: always
 
-  # ── Stream Processing ──────────────────────────────────────────────────────
+  # ── Spark jar initialiser ──────────────────────────────────────────────────
+  # Runs once on `docker compose up`, downloads 3 jars into the named volume,
+  # then exits. The spark service won't start until this completes successfully.
+  spark-jar-init:
+      image: curlimages/curl:8.6.0
+      user: root
+      volumes:
+        - spark-jars:/jars
+      command: |                          # ← | not >
+        sh -c '
+          set -e
+
+          if [ -f /jars/.done ]; then
+            echo "Jars already present, skipping."; exit 0;
+          fi
+
+          echo "[1/3] Guava 32..."
+          curl -fL -o /jars/guava-32.1.3-jre.jar https://repo1.maven.org/maven2/com/google/guava/guava/32.1.3-jre/guava-32.1.3-jre.jar
+
+          echo "[2/3] GCS connector (shaded)..."
+          curl -fL -o /jars/gcs-connector-hadoop3-2.2.22-shaded.jar https://repo1.maven.org/maven2/com/google/cloud/bigdataoss/gcs-connector/hadoop3-2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar
+
+          echo "[3/3] BigQuery connector..."
+          curl -fL -o /jars/spark-bigquery-with-dependencies_2.12-0.36.1.jar https://repo1.maven.org/maven2/com/google/cloud/spark/spark-bigquery-with-dependencies_2.12/0.36.1/spark-bigquery-with-dependencies_2.12-0.36.1.jar
+
+          touch /jars/.done
+          echo "Done."
+        '
+  # ── Stream Processing ───────────────────────────────────────────────────────
   spark:
     image: apache/spark:3.5.0
     user: root
-    command: ["tail", "-f", "/dev/null"]
+    command:
+      - bash
+      - -c
+      - |
+        rm -f /opt/spark/jars/guava-14.0.1.jar
+ 
+        tail -f /dev/null
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /opt/spark/work-dir/keys/mycreds.json
+      GCS_KEY_FILE: /opt/spark/work-dir/keys/mycreds.json
+      SPARK_EXTRA_CLASSPATH: "/opt/spark/extra-jars/guava-32.1.3-jre.jar:/opt/spark/extra-jars/gcs-connector-hadoop3-2.2.22-shaded.jar:/opt/spark/extra-jars/spark-bigquery-with-dependencies_2.12-0.36.1.jar"
     ports:
-      - "4040:4040"  # Spark Application UI (active while a job runs)
+      - "4040:4040"
     volumes:
       - ./src:/opt/spark/work-dir/src
-      - ./terraform/keys/mycreds.json:/opt/spark/work-dir/keys/mycreds.json:ro
+      - ./terraform/keys:/opt/spark/work-dir/keys:ro
+      - spark-jars:/opt/spark/extra-jars   # populated by spark-jar-init
     depends_on:
       kafka:
         condition: service_healthy
+      spark-jar-init:
+        condition: service_completed_successfully
     restart: always
 
   # ── Producer ──────────────────────────────────────────────────────────────
@@ -222,6 +261,7 @@ volumes:
   postgres-data:
   kafka-data:
   redis-data:
+  spark-jars:    # persisted across restarts; only downloaded once
 
 networks:
   default:

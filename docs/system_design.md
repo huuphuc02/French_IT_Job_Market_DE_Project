@@ -13,7 +13,7 @@
 - [I. ELT System Design](#i-elt-system-design)
 - [J. DAG Design](#j-dag-design)
 - [K. Data Flow Diagram](#k-data-flow-diagram)
-- [L. CDC Pattern](#l-cdc-pattern)
+- [L. CDC Pattern](#L-cdc-pattern)
 
 ---
 

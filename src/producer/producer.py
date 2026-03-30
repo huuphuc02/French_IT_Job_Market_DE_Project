@@ -22,14 +22,15 @@ def delivery_report(err, msg):
 
 def publish_offer(producer: Producer, offer: dict):
     event = {
-        "event_type": "INSERT",
-        "payload": offer,
-        "published_at": datetime.now(timezone.utc).isoformat(),
+        "event_type":      "INSERT",
+        "event_timestamp": datetime.now(timezone.utc).isoformat(),
+        "offer_id":        offer.get("id", ""),
+        "offer":           offer,
     }
     producer.produce(
         KAFKA_TOPIC_BACKFILL,
         key = offer.get("id","").encode(),
-        value = json.dumps(event).encode(),
+        value = json.dumps(event, ensure_ascii=False).encode(),
         callback = delivery_report,
     )
     # Non-blocking; flush happens in batches / at the end

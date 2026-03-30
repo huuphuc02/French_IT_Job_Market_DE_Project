@@ -3,3 +3,5 @@
 airflow/logs/
 venv/
 src/producer/__pycache__/
+keys/
+output_local/
