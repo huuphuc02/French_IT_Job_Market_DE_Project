@@ -1,3 +1,5 @@
+{{ config(materialized='table') }}
+
 with base as (
     select *
     from {{ ref('stg_job_offers_clean')}}
@@ -45,7 +47,7 @@ select
   experience_label,
   qualification_label,
   education_level,
-  salary_text,
+  salary_text, 
   salary_min_annual,
   salary_max_annual,
   is_accessible_th,

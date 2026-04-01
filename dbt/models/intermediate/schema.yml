@@ -1,0 +1,278 @@
+version: 2
+
+models:
+  - name: int_latest_offer_record
+    description: >
+      Keeps the latest known INSERT/UPDATE payload per offer_id from staging offers.
+      Latest is chosen by date_updated (fallback date_created), then ingested_at.
+    columns:
+      - name: offer_id
+        description: Unique job offer identifier from France Travail.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: event_type
+        description: CDC event type from staging (INSERT or UPDATE).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: 
+                values: ["INSERT", "UPDATE"]
+
+      - name: ingested_at
+        description: Timestamp when Spark ingested the event into BigQuery staging.
+        data_tests:
+          - not_null
+
+      - name: date_created
+        description: Offer creation timestamp from source payload.
+
+      - name: date_updated
+        description: Offer update timestamp from source payload.
+
+      - name: title
+        description: Offer title.
+
+      - name: description
+        description: Offer description text.
+
+      - name: rome_code
+        description: ROME occupational code.
+
+      - name: rome_label
+        description: ROME occupational label.
+
+      - name: appellation_label
+        description: Job appellation label.
+
+      - name: dept_code
+        description: Department code parsed from location.
+
+      - name: commune_code
+        description: INSEE commune code.
+
+      - name: commune_name
+        description: Commune name.
+
+      - name: code_postal
+        description: Postal code.
+
+      - name: latitude
+        description: Latitude coordinate.
+
+      - name: longitude
+        description: Longitude coordinate.
+
+      - name: company_name
+        description: Employer/company name.
+
+      - name: company_size
+        description: Company size bucket.
+
+      - name: naf_code
+        description: NAF activity code.
+
+      - name: sector_code
+        description: Sector code from source payload.
+
+      - name: sector_label
+        description: Sector label from source payload.
+
+      - name: contract_type
+        description: Contract type code.
+
+      - name: contract_type_label
+        description: Human-readable contract type.
+
+      - name: work_duration
+        description: Work duration label (e.g., Temps plein).
+
+      - name: is_alternance
+        description: Whether the offer is alternance/apprenticeship.
+
+      - name: experience_required
+        description: Experience requirement code.
+
+      - name: experience_label
+        description: Human-readable experience requirement.
+
+      - name: qualification_label
+        description: Qualification label.
+
+      - name: education_level
+        description: Education level parsed from formations.
+
+      - name: salary_text
+        description: Raw salary text from source payload.
+
+      - name: salary_min_annual
+        description: Parsed minimum annual salary in EUR.
+
+      - name: salary_max_annual
+        description: Parsed maximum annual salary in EUR.
+
+      - name: is_accessible_th
+        description: Whether the offer is accessible to disabled workers.
+
+      - name: num_positions
+        description: Number of open positions.
+
+  - name: int_offer_expiration_latest
+    description: >
+      Keeps the latest EXPIRE timestamp per offer_id from staging expirations.
+    columns:
+      - name: offer_id
+        description: Unique job offer identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: date_expired
+        description: Most recent expiration timestamp for the offer.
+
+  - name: int_offer_lifecycle
+    description: >
+      Joins latest offer payload with latest expiration to build lifecycle state.
+      Computes is_active and offer_lifetime_days.
+    columns:
+      - name: offer_id
+        description: Unique job offer identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: event_type
+        description: Latest INSERT/UPDATE event type used for the payload.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: 
+                values: ["INSERT", "UPDATE"]
+
+      - name: ingested_at
+        description: Ingestion timestamp of the latest payload.
+        data_tests:
+          - not_null
+
+      - name: date_created
+        description: Offer creation timestamp.
+
+      - name: date_updated
+        description: Offer last update timestamp.
+
+      - name: title
+        description: Offer title.
+
+      - name: description
+        description: Offer description text.
+
+      - name: rome_code
+        description: ROME occupational code.
+
+      - name: rome_label
+        description: ROME occupational label.
+
+      - name: appellation_label
+        description: Job appellation label.
+
+      - name: dept_code
+        description: Department code parsed from location.
+
+      - name: commune_code
+        description: INSEE commune code.
+
+      - name: commune_name
+        description: Commune name.
+
+      - name: code_postal
+        description: Postal code.
+
+      - name: latitude
+        description: Latitude coordinate.
+
+      - name: longitude
+        description: Longitude coordinate.
+
+      - name: company_name
+        description: Employer/company name.
+
+      - name: company_size
+        description: Company size bucket.
+
+      - name: naf_code
+        description: NAF activity code.
+
+      - name: sector_code
+        description: Sector code.
+
+      - name: sector_label
+        description: Sector label.
+
+      - name: contract_type
+        description: Contract type code.
+
+      - name: contract_type_label
+        description: Human-readable contract type.
+
+      - name: work_duration
+        description: Work duration label.
+
+      - name: is_alternance
+        description: Whether the offer is alternance/apprenticeship.
+
+      - name: experience_required
+        description: Experience requirement code.
+
+      - name: experience_label
+        description: Human-readable experience requirement.
+
+      - name: qualification_label
+        description: Qualification label.
+
+      - name: education_level
+        description: Education level parsed from formations.
+
+      - name: salary_text
+        description: Raw salary text.
+
+      - name: salary_min_annual
+        description: Parsed minimum annual salary in EUR.
+
+      - name: salary_max_annual
+        description: Parsed maximum annual salary in EUR.
+
+      - name: is_accessible_th
+        description: Whether the offer is accessible to disabled workers.
+
+      - name: num_positions
+        description: Number of open positions.
+
+      - name: is_active
+        description: TRUE when no expiration record exists for this offer.
+        data_tests:
+          - not_null
+
+      - name: date_expired
+        description: Expiration timestamp (NULL if still active).
+
+      - name: offer_lifetime_days
+        description: Number of days between date_created and date_expired (expired offers only).
+
+  - name: int_active_offers
+    description: >
+      Current active-market view filtered from int_offer_lifecycle (is_active = TRUE).
+    columns:
+      - name: offer_id
+        description: Unique active job offer identifier.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: is_active
+        description: Always TRUE in this model.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: 
+                values: [true]
