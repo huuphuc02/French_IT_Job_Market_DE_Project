@@ -1,0 +1,131 @@
+models:
+  - name: stg_job_offers_clean
+    description: >
+     Staging model for enriched French IT job offers ingested from Kafka via Spark.
+     Standardizes column names/types and keeps CDC lifecycle fields for dbt downstream transforms.
+    columns:
+      - name: offer_id
+        description: Unique ID of the job offer.
+        data_tests:
+          - not_null
+      - name: event_type
+        description: CDC event type emitted by the producer.
+        data_tests:
+          - accepted_values:
+              arguments: ["INSERT", "UPDATE", "EXPIRE"]
+      - name: ingested_at
+        description: Timestamp when the Spark streaming job ingested the event.
+        data_tests:
+          - not_null
+      - name: is_active
+        description: TRUE for INSERT/UPDATE events; lifecycle is completed when EXPIRE is received.
+        data_tests:
+          - not_null
+      - name: date_created
+        description: Offer creation date from France Travail API.
+      - name: date_updated
+        description: Offer last update date from France Travail API.
+      - name: title
+        description: Offer title (`intitule`).      
+      - name: description
+        description: Offer description text.
+      - name: rome_code
+        description: ROME code (occupation taxonomy).
+      - name: rome_label
+        description: ROME label/description.
+      - name: appellation_label
+        description: Appellation label.
+      - name: dept_code
+        description: Department code extracted from location libelle (or derived from postal code when needed).
+      - name: commune_code
+        description: Commune code from API location.
+      - name: commune_name
+        description: Commune name parsed/enriched from API location.
+      - name: code_postal
+        description: Postal code parsed/enriched from API location.
+      - name: latitude
+        description: Latitude from API location.
+      - name: longitude
+        description: Longitude from API location.
+      - name: company_name
+        description: Company name (`entreprise.nom`).
+      - name: company_size
+        description: Company size bucket (`trancheEffectifEtab`).
+      - name: naf_code
+        description: NAF code (`codeNAF`).
+      - name: sector_code
+        description: Sector code (`secteurActivite`).
+      - name: sector_label
+        description: Sector label (`secteurActiviteLibelle`).
+      - name: contract_type
+        description: Contract type code (`typeContrat`).
+      - name: contract_type_label
+        description: Contract type label (`typeContratLibelle`).
+      - name: work_duration
+        description: Normalized work duration label (`dureeTravailLibelleConverti`).
+      - name: is_alternance
+        description: Whether the offer is apprenticeship/alternance.
+      - name: experience_required
+        description: Experience required value (`experienceExige`).
+      - name: experience_label
+        description: Experience label (`experienceLibelle`).
+      - name: qualification_label
+        description: Qualification label (`qualificationLibelle`).
+      - name: education_level
+        description: Education level derived from the first formation element (`formations[0].niveauLibelle`).
+      - name: salary_text
+        description: Raw salary libelle (`salaire.libelle`).
+      - name: salary_min_annual
+        description: Minimum normalized annual salary (EUR/year).
+      - name: salary_max_annual
+        description: Maximum normalized annual salary (EUR/year).
+      - name: is_accessible_th
+        description: Whether the offer is accessible to disabled workers (`accessibleTH`).
+      - name: num_positions
+        description: Number of positions (`nombrePostes`).
+
+  - name: stg_job_skills_clean
+    description: >
+     Staging model for extracted skills per offer (one row per offer_id + skill_label).
+    columns:
+      - name: offer_id
+        description: Job offer ID this skill belongs to.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: 
+                to: ref('stg_job_offers_clean')
+                field: offer_id
+      - name: skill_label
+        description: Canonical skill label extracted from competences/description.
+        data_tests:
+          - not_null
+      - name: exigence_level
+        description: Skill exigence level (S or E) based on source/extraction.
+        data_tests:
+          - accepted_values:
+              arguments: ["S", "E"]
+      - name: extraction_source
+        description: Skill extraction source (e.g., api_competences vs description_regex).
+        data_tests:
+          - not_null
+      - name: ingested_at
+        description: Timestamp when the Spark streaming job ingested the event.
+        data_tests:
+          - not_null
+  - name: stg_offer_expirations_clean
+    description: Offers expired
+    columns:
+      - name: offer_id
+        description: Unique ID of the job offer.
+        data_tests:
+          - not_null
+      - name: expired_at
+        description: Timestamp when the offer is expired
+        data_tests:
+          - not_null
+      - name: ingested_at
+        description: Timestamp when the Spark streaming job ingested the expired event.
+          
+   
+      

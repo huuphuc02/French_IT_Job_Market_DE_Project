@@ -21,6 +21,13 @@ clean-targets:
 vars:
 
 models:
+  french_it_jobs:
+    staging:
+      +materialized: view
+    intermediate:
+      +materialized: table
+    marts:
+      +materialized: table
 
 flags:
   require_generic_test_arguments_property: true

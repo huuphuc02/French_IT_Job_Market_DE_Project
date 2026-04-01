@@ -1,0 +1,12 @@
+sources:
+  - name: french_it_jobs
+    database: basic-decoder-415403
+    schema: french_it_jobs
+    description: "Raw/landing staging tables produced by Spark Structured Streaming."
+    tables:
+      - name: stg_job_offers
+        description: "Enriched job offers (INSERT/UPDATE events) from Kafka."
+      - name: stg_job_skills
+        description: "Extracted skills per offer (one row per offer_id + skill_label)."
+      - name: stg_offer_expirations
+        description: "Offer expirations (EXPIRE events) with offer_id + expired_at."
