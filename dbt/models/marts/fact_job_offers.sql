@@ -41,18 +41,24 @@ joined as (
         -- Measures / descriptive attributes carried in the fact
         l.contract_type,
         l.contract_type_label,
-        l.work_duration,
         l.is_alternance,
 
-        l.experience_required,
-        l.experience_label,
+        case 
+            when l.experience_required = 'E' then 'Required'
+            when l.experience_required = 'D' then 'Beginner accepted'
+            when l.experience_required = 'S' then 'Desired'
+            else ''
+        end as experience_required,
+        case 
+            when l.experience_label = 'Débutant accepté' then '0 An(s)'
+            when l.experience_label = 'Expérience exigée' then 'Experience required (not specified)'
+            else {{ first_element("l.experience_label", "' - '") }}
+        end as experience_label,
         l.qualification_label,
 
         l.salary_min_annual,
         l.salary_max_annual,
         l.salary_text,
-
-        l.is_accessible_th,
         l.num_positions
 
     from lifecycle l
