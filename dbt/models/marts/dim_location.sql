@@ -30,7 +30,12 @@ final as (
             "coalesce(code_postal, '')"
         ]) }} as location_key,
         commune_code,
-        commune_name,
+        case 
+            when starts_with(commune_name, 'Paris') then 'Paris'
+            when starts_with(commune_name, 'Lyon') then 'Lyon'
+            when starts_with(commune_name, 'Marseille') then 'Marseille'
+            else commune_name
+        end as commune_name,
         code_postal,
         dept_code,
         dept_name,
