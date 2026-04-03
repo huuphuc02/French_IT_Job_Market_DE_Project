@@ -1,0 +1,33 @@
+name: 'french_it_job_de_project'
+version: '1.0.0'
+
+# Require a specific dbt version for reproducibility
+require-dbt-version: [">=1.7.0", "<3.0.0"]
+
+profile: 'french_it_job_de_project'
+
+# These configurations specify where dbt should look for different types of files.
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+vars:
+
+models:
+  french_it_jobs:
+    staging:
+      +materialized: view
+    intermediate:
+      +materialized: table
+    marts:
+      +materialized: table
+
+flags:
+  require_generic_test_arguments_property: true

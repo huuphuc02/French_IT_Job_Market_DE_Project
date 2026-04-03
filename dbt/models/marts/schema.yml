@@ -1,0 +1,113 @@
+version: 2
+
+models:
+  - name: dim_date
+    description: >
+      Calendar dimension built from offer lifecycle dates (created, updated, expired).
+    columns:
+      - name: date_day
+        description: Calendar date (DATE).
+        data_tests:
+          - not_null
+          - unique
+
+      - name: year
+        description: Calendar year.
+
+      - name: quarter
+        description: Calendar quarter (1–4).
+
+      - name: month
+        description: Month of year (1–12).
+
+      - name: month_name
+        description: Full month name (English).
+
+      - name: week_of_year
+        description: ISO week of year.
+
+      - name: day_of_month
+        description: Day of month (1–31).
+
+      - name: day_of_week
+        description: Day of week (BigQuery DAYOFWEEK semantics).
+
+      - name: day_name
+        description: Weekday name (English).
+
+      - name: is_weekend
+        description: True for Sat/Sun per BigQuery DAYOFWEEK mapping.
+
+  - name: dim_location
+    description: >
+      Location dimension: department, commune, postal, coordinates, optional department/region from seed.
+    columns:
+      - name: location_key
+        description: Surrogate key for the location grain.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: dept_code
+        description: French department code.
+
+      - name: dept_name
+        description: Department name from dept_region seed.
+
+      - name: region_name
+        description: Region name from dept_region seed.
+
+      - name: commune_code
+        description: INSEE commune code.
+
+      - name: commune_name
+        description: Commune name.
+
+      - name: code_postal
+        description: Postal code.
+
+  - name: dim_company
+    description: >
+      Company / employer dimension derived from distinct lifecycle offer attributes.
+    columns:
+      - name: company_key
+        description: Surrogate key for company grain.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: company_name
+        description: Employer name.
+        data_tests:
+          - not_null
+
+      - name: company_size
+        description: Establishment size band.
+
+      - name: naf_code
+        description: NAF activity code.
+
+      - name: sector_code
+        description: Sector activity code.
+
+      - name: sector_label
+        description: Sector activity label.
+
+  - name: dim_rome
+    description: >
+      ROME occupation dimension.
+    columns:
+      - name: rome_key
+        description: Surrogate key for ROME code.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: rome_code
+        description: ROME occupational code.
+        data_tests:
+          - not_null
+          - unique
+
+      - name: rome_label
+        description: ROME label.
