@@ -138,6 +138,16 @@ def parse_salary(libelle: Optional[str]) -> ParsedSalary:
     )
 
 
+# ── Plausibility thresholds ──────────────────────────────────────────────────
+# France Travail sometimes writes annual totals in the "Mensuel" or "Horaire"
+# fields (e.g. "Mensuel de 58000.0 Euros à 72000.0 Euros sur 12.0 mois").
+# A real monthly salary rarely exceeds ~12 000 EUR; a real hourly rate rarely
+# exceeds 500 EUR/h.  When the raw figure exceeds these caps we assume the
+# value is already annual and return it unchanged.
+_MONTHLY_ANNUAL_THRESHOLD = 12_000   # EUR/month — above this → treat as annual
+_HOURLY_ANNUAL_THRESHOLD  =    500   # EUR/hour  — above this → treat as annual
+
+
 def _to_annual(
     period: Period,
     min_val: float,
@@ -151,10 +161,17 @@ def _to_annual(
         return min_val, max_val
 
     if period == Period.MONTHLY:
+        # Plausibility guard: real monthly salary is almost never > 12 000 EUR.
+        # If it is, the figure is almost certainly already annual.
+        if min_val > _MONTHLY_ANNUAL_THRESHOLD:
+            return min_val, max_val
         m = months if months else 12.0
         return min_val * m, max_val * m
 
     if period == Period.HOURLY:
+        # Plausibility guard: real hourly rate is almost never > 500 EUR/h.
+        if min_val > _HOURLY_ANNUAL_THRESHOLD:
+            return min_val, max_val
         # months is rare for hourly; use standard 1,820 h/year
         return min_val * HOURS_PER_YEAR, max_val * HOURS_PER_YEAR
 
@@ -185,6 +202,10 @@ if __name__ == "__main__":
         "Horaire de 14.5 Euros a 18.0 Euros",
         "Horaire de 22,50 Euros",
         "Annuel de 60 000 Euros a 80 000 Euros",   # space-separated thousands
+        # Abnormal: annual figure stated inside Mensuel/Horaire block
+        "Mensuel de 58000.0 Euros à 72000.0 Euros sur 12.0 mois",
+        "Horaire de 70000.0 Euros à 90000.0 Euros sur 12.0 mois",
+        # Unparseable
         "",                                         # empty → parsed_ok=False
         "À négocier selon profil",                  # unparseable → parsed_ok=False
     ]
