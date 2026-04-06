@@ -70,6 +70,7 @@ by_rome as (
 
     select
         skill_label,
+        exigence_level,
         cast(null as string) as region_name,
         cast(null as string) as dept_name,
         cast(null as string) as dept_code,
@@ -81,13 +82,13 @@ by_rome as (
         count(distinct offer_id)   as offer_count
     from skills
     where rome_code is not null
-    group by skill_label, rome_code, rome_label
+    group by skill_label, exigence_level, rome_code, rome_label
     having count(distinct offer_id) > 10
 
 ),
 
--- Skill demand by experience level
-by_experience as (
+-- Skill demand by contract type
+by_contract as (
 
     select
         skill_label,

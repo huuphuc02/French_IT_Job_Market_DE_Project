@@ -2,12 +2,13 @@
 
 with dedup as (
 
-    select distinct
-        dept_code,
-        commune_code,
-        commune_name,
-        code_postal
+    select 
+        max(dept_code) as dept_code,
+        max(commune_code) as commune_code,
+        coalesce(commune_name, '') as commune_name,
+        coalesce(code_postal, '') as code_postal
     from {{ ref('int_offer_lifecycle') }}
+    group by 3, 4
 
 ),
 

@@ -40,7 +40,7 @@ by_department as (
     from offers
     where dept_code is not null
     group by region_name, dept_code, dept_name
-)
+),
 
 by_commune as (
     select

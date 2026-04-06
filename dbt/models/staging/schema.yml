@@ -12,7 +12,7 @@ models:
         description: CDC event type emitted by the producer.
         data_tests:
           - accepted_values:
-              arguments: ["INSERT", "UPDATE", "EXPIRE"]
+              values: ["INSERT", "UPDATE", "EXPIRE"]
       - name: ingested_at
         description: Timestamp when the Spark streaming job ingested the event.
         data_tests:
@@ -104,7 +104,7 @@ models:
         description: Skill exigence level (S or E) based on source/extraction.
         data_tests:
           - accepted_values:
-              arguments: ["S", "E"]
+              values: ["S", "E"]
       - name: extraction_source
         description: Skill extraction source (e.g., api_competences vs description_regex).
         data_tests:

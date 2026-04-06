@@ -17,8 +17,7 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              arguments: 
-                values: ["INSERT", "UPDATE"]
+              values: ["INSERT", "UPDATE"]
 
       - name: ingested_at
         description: Timestamp when Spark ingested the event into BigQuery staging.
@@ -147,8 +146,7 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              arguments: 
-                values: ["INSERT", "UPDATE"]
+              values: ["INSERT", "UPDATE"]
 
       - name: ingested_at
         description: Ingestion timestamp of the latest payload.
@@ -274,5 +272,5 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              arguments: 
-                values: [true]
+              values: [true]
+              quote: false

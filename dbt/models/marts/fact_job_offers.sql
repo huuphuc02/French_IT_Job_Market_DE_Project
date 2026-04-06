@@ -34,9 +34,9 @@ joined as (
         l.offer_lifetime_days,
 
         -- Dimension keys
-        dl.location_key,
-        dcw.company_key,
-        dr.rome_key,
+        {{ dbt_utils.generate_surrogate_key(["coalesce(l.commune_name, '')", "coalesce(l.code_postal, '')"]) }} as location_key,
+        {{ dbt_utils.generate_surrogate_key(["coalesce(l.company_name, '')", "coalesce(l.naf_code, '')", "coalesce(l.sector_code, '')"]) }} as company_key,
+        {{ dbt_utils.generate_surrogate_key(["coalesce(l.rome_code, '')"]) }} as rome_key,
 
         -- Measures / descriptive attributes carried in the fact
         case l.contract_type
@@ -80,18 +80,6 @@ joined as (
     left join dim_dates de
         on l.date_expired is not null
        and date(l.date_expired) = de.date_day
-
-    left join {{ ref('dim_location') }} dl
-        on dl.code_postal = l.code_postal
-       and dl.commune_name = l.commune_name
-
-    left join {{ ref('dim_company') }} dcw
-        on dcw.company_name = l.company_name
-       and dcw.naf_code = l.naf_code
-       and dcw.sector_code = l.sector_code
-
-    left join {{ ref('dim_rome') }} dr
-        on dr.rome_code = l.rome_code
 
 ),
 
