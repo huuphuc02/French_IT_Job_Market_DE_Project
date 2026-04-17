@@ -7,7 +7,7 @@ Checks performed:
   1. volume_check      — stg_job_offers row count is above expected floor
   2. null_rate_check   — critical columns in fact_job_offers have < 5% NULLs
   3. duplicate_check   — fact_job_offers has no duplicate offer_ids
-  4. expire_rate_check — EXPIRE event rate is not anomalously high (< 50% of active)
+  4. expire_rate_check — EXPIRE event rate is not anomalously high (< 10% of active)
   5. log_dq_summary    — log all results; raise if any check failed
 
 All checks are soft-fail by default: each check pushes a PASS/FAIL flag to XCom.
@@ -32,7 +32,7 @@ BQ_DATASET = "french_it_jobs"
 # Thresholds
 MIN_STAGING_ROWS    = 100       # expect at least 100 offers in staging
 MAX_NULL_RATE       = 0.05      # critical columns should be < 5% NULL
-MAX_EXPIRE_RATE     = 0.50      # EXPIRE events should be < 50% of active count
+MAX_EXPIRE_RATE     = 0.10      # EXPIRE events should be < 10% of active count
 
 
 def _get_bq_client():
