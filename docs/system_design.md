@@ -662,6 +662,16 @@ erDiagram
     fact_job_skills ||--o{ dim_skill : "skill_key"
 ```
 
+### Reporting Marts (Business Analytics)
+
+Built on top of the Star Schema, we materialize several aggregated reporting views to directly serve the Looker Studio dashboard, answering the defined Business Requirements:
+
+- `mart_skill_demand`: Aggregation of skill counts, trends over time, and requirement levels (BR1).
+- `mart_salary_analysis` / `mart_salary_by_region`: Median and average salaries sliced by region, experience, contract type, and skill (BR2).
+- `mart_contract_distribution`: Job posting breakdown by CDI, CDD, Freelance, etc., across regions (BR3).
+- `mart_geographic_overview`: Job counts by department and region to visualize geographic density (BR4).
+- `mart_offer_lifecycle`: Average time-to-fill (offer lifetime) by ROME code and contract type, proving out the CDC flow.
+
 
 
 ### BigQuery Optimization
@@ -768,8 +778,8 @@ flowchart TB
 | **Message Broker**    | Apache Kafka (KRaft mode)   | Two topics: `it-job-offers-backfill` (Day 1) + `it-job-offers-cdc` (ongoing) |
 | **Stream Processing** | Spark Structured Streaming  | Route CDC events (INSERT/UPDATE/EXPIRE); extract skills; normalize salary; MERGE into BigQuery |
 | **Data Lake**         | Google Cloud Storage (GCS)  | `/snapshots/` (Day 1), `/raw/` (ongoing), `/processed/` (enriched Parquet) |
-| **Data Warehouse**    | Google BigQuery             | Analytical queries; `fact_job_offers` with CDC lifecycle columns      |
-| **Transformation**    | dbt                         | Staging, intermediate (`int_active_offers`), mart models (incl. `mart_offer_lifecycle`) |
+| **Data Warehouse**    | Google BigQuery             | Analytical queries; Dimensional model (Star schema) with CDC lifecycle columns |
+| **Transformation**    | dbt                         | Staging, intermediate, marts (Star Schema), and reporting (`mart_offer_lifecycle`, `mart_salary_analysis`, etc.) |
 | **Orchestration**     | Apache Airflow              | `dag_backfill_initial` (once) + `dag_cdc_ingest` (10 min) + `dag_dbt_transform` (hourly) |
 | **Dashboard**         | Looker Studio               | Skill demand, salary trends, geographic distribution, offer lifecycle |
 
@@ -927,7 +937,8 @@ flowchart TB
     subgraph transform_dbt [Transform - dbt]
         Staging["Staging Models\n(clean, type-cast)"]
         Intermediate["Intermediate Models\n(join, normalize)"]
-        Marts["Mart Models\n(aggregated analytics)"]
+        Marts["Marts (Star Schema)\n(fact and dim tables)"]
+        Reporting["Reporting Marts\n(aggregated analytics)"]
     end
 
     subgraph consume [Consume]
@@ -950,7 +961,8 @@ flowchart TB
     WriteBQ --> Staging
     Staging --> Intermediate
     Intermediate --> Marts
-    Marts --> LookerDashboard
+    Marts --> Reporting
+    Reporting --> LookerDashboard
 ```
 
 

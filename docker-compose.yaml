@@ -11,12 +11,17 @@ x-airflow-common: &airflow-common
     KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     REDIS_HOST: redis
     REDIS_PORT: "6379"
+    _PIP_ADDITIONAL_REQUIREMENTS: "confluent-kafka redis requests python-dotenv dbt-bigquery"
+    FT_CLIENT_ID: ${FT_CLIENT_ID} 
+    FT_CLIENT_SECRET: ${FT_CLIENT_SECRET}
   volumes:
     - ./airflow/dags:/opt/airflow/dags
     - ./airflow/logs:/opt/airflow/logs
+    - ./dbt:/opt/airflow/dbt 
     - ./airflow/plugins:/opt/airflow/plugins
     - ./src:/opt/airflow/src
     - ./terraform/keys:/opt/airflow/keys:ro
+    - /var/run/docker.sock:/var/run/docker.sock
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     postgres:

@@ -1,155 +1,378 @@
-## Course Project
+# 🇫🇷 French IT Job Market — End-to-End Data Engineering Project
 
-[🎥 Projects how-to (watch it!)](https://www.youtube.com/watch?v=BL0E8xO8OnE)
+A production-grade data engineering pipeline that ingests, processes, and analyses **French IT job offers** from the [France Travail (Pôle Emploi) API](https://francetravail.io/data/api/offres-emploi) in real time.
 
-### Objective
+It combines **Kafka streaming**, **Spark Structured Streaming**, **Change-Data-Capture (CDC)**, **dbt transformations on BigQuery**, and a [**Looker Studio dashboard**](https://datastudio.google.com/reporting/259bf2a2-5ba2-4e3b-b1dd-62e7d67bae26) — all orchestrated by **Apache Airflow** and provisioned with **Terraform**.
 
-The goal of this project is to apply everything we have learned
-in this course to build an end-to-end data pipeline.
+---
 
-### Problem statement
+## 📐 Architecture
 
-Develop a dashboard with two tiles by:
+![Architecture Diagram](./tech_stack_architecture.png)
 
-- Selecting a dataset of interest (see [Datasets](#datasets))
-- Creating a pipeline for processing this dataset and putting it to a datalake
-- Creating a pipeline for moving the data from the lake to a data warehouse
-- Transforming the data in the data warehouse: prepare it for the dashboard
-- Building a dashboard to visualize the data
+---
 
-## Data Pipeline
+## 🛠 Tech Stack
 
-The pipeline could be **stream** or **batch**: this is the first thing you'll need to decide 
+| Layer | Technology |
+|---|---|
+| **Ingestion** | Python 3.12, France Travail REST API |
+| **Message Broker** | Apache Kafka (Confluent 7.6, KRaft mode — no Zookeeper) |
+| **CDC State Store** | Redis 7.2 |
+| **Stream Processing** | Apache Spark 3.5 (Structured Streaming) |
+| **Data Lake** | Google Cloud Storage (GCS) |
+| **Data Warehouse** | Google BigQuery |
+| **Transformation** | dbt-core with dbt-bigquery |
+| **Orchestration** | Apache Airflow 2.9 |
+| **Infrastructure** | Terraform (Google provider) |
+| **Visualisation** | Google Looker Studio |
+| **Containerisation** | Docker Compose |
 
-- **Stream**: If you want to consume data in real-time and put them to data lake
-- **Batch**: If you want to run things periodically (e.g. hourly/daily)
+---
 
-## Technologies
+## 📁 Project Structure
 
-You don't have to limit yourself to technologies covered in the course. You can use alternatives as well:
+```
+.
+├── src/
+│   ├── producer/
+│   │   ├── backfill.py          # Day-1 historical load → Kafka
+│   │   ├── cdc.py               # Incremental CDC sync → Kafka
+│   │   ├── ft_client.py         # France Travail API wrapper
+│   │   └── config.py            # ROME codes, environment config
+│   └── streaming/
+│       ├── spark_streaming_job.py   # Spark Structured Streaming entry point
+│       ├── skill_extractor.py       # API + regex skill extraction
+│       ├── salary_parser.py         # Salary normalisation → annual EUR
+│       ├── location_enricher.py     # Commune/dept/region parsing
+│       └── schemas.py               # Kafka event schema (StructType)
+│
+├── dbt/
+│   ├── models/
+│   │   ├── staging/             # stg_job_offers_clean, stg_job_skills_clean, stg_offer_expirations_clean
+│   │   ├── intermediate/        # int_offer_lifecycle, int_active_offers, ...
+│   │   └── marts/
+│   │       ├── dim_date.sql
+│   │       ├── dim_location.sql
+│   │       ├── dim_company.sql
+│   │       ├── dim_rome.sql
+│   │       ├── fact_job_offers.sql
+│   │       ├── fact_job_skills.sql
+│   │       ├── schema.yml           # All dbt tests
+│   │       └── reporting/
+│   │           ├── mart_salary_analysis.sql
+│   │           ├── mart_skill_demand.sql
+│   │           ├── mart_geographical_overview.sql
+│   │           ├── mart_offer_lifecycle.sql
+│   │           └── mart_contract_type_distribution.sql
+│   ├── seeds/
+│   │   └── dept_region.csv      # French department → region mapping
+│   └── packages.yml
+│
+├── airflow/
+│   └── dags/
+│       ├── dag_backfill_initial.py  # One-shot: full historical load
+│       ├── dag_cdc_ingest.py        # Every 10 min: CDC poll → Kafka
+│       ├── dag_dbt_transform.py     # Hourly: seed → staging → marts → test
+│       └── dag_data_quality.py      # Daily: volume, null, duplicate, expire checks
+│
+├── terraform/
+│   ├── main.tf                  # GCS bucket + BigQuery dataset
+│   └── variables.tf
+│
+├── docker-compose.yaml
+├── requirements.txt
+└── .env                         # FT_CLIENT_ID, FT_CLIENT_SECRET, AIRFLOW_UID
+```
 
-- **Cloud**: AWS, GCP, Azure, ...
-- **Infrastructure as code (IaC)**: Terraform, Pulumi, Cloud Formation, ...
-- **Workflow orchestration**: Airflow, Prefect, Luigi, ...
-- **Data Warehouse**: BigQuery, Snowflake, Redshift, ...
-- **Batch processing**: Spark, Flink, AWS Batch, ...
-- **Stream processing**: Kafka, Pulsar, Kinesis, ...
+---
 
-If you use a tool that wasn't covered in the course, be sure to explain what that tool does.
+## 🔄 Data Flow
 
-If you're not certain about some tools, ask in Slack.
+### 1. Day-1 Backfill
+The Python producer fetches all current IT job offers (12 ROME codes: M1801–M1813, M1405, E1206) from the France Travail API, publishes them as `INSERT` events to the **`it-job-offers-backfill`** Kafka topic, and seeds Redis with all active offer IDs + timestamps.
 
-## Dashboard
+### 2. Real-Time CDC (every 10 minutes)
+The CDC producer re-fetches the latest offers per ROME code and diffs against Redis:
+- **New offer** → publish `INSERT` to `it-job-offers-cdc`
+- **Changed offer** → publish `UPDATE`
+- **Offer disappeared** → publish `EXPIRE`
 
-You can use any of the tools shown in the course (Looker Studio or Streamlit) or any other BI tool of your choice to build a dashboard. If you do use another tool, please specify and make sure that the dashboard is somehow accessible to your peers. 
+### 3. Spark Structured Streaming
+Spark consumes both Kafka topics every 30 seconds:
+- Enriches each offer (salary normalisation, location parsing, skill extraction)
+- Writes raw events to **GCS** (data lake)
+- Writes structured rows to **BigQuery** staging tables with explicit schemas
 
-Your dashboard should contain at least two tiles, we suggest you include:
+### 4. dbt Transformation (hourly)
+```
+stg_* → int_* → dim_* + fact_* → mart_*
+```
+- **Staging**: cast, clean, dedup raw BigQuery tables
+- **Intermediate**: resolve CDC lifecycle, identify active offers, compute lifetime days
+- **Marts (Star Schema)**: `dim_date`, `dim_location`, `dim_company`, `dim_rome`, `fact_job_offers`, `fact_job_skills`
+- **Reporting Marts**: pre-aggregated tables served directly to Looker Studio
 
-- 1 graph that shows the distribution of some categorical data 
-- 1 graph that shows the distribution of the data across a temporal line
+### 5. Data Quality (daily)
+Four automated checks: row volume, NULL rates on critical columns, duplicate PK detection, and EXPIRE event anomaly guard.
 
-Ensure that your graph is easy to understand by adding references and titles.
+---
 
-Example dashboard: image
+## 🚀 Quick Start
 
-## Peer reviewing
+### Prerequisites
+- Docker & Docker Compose
+- A [France Travail API](https://francetravail.io) account (`FT_CLIENT_ID` + `FT_CLIENT_SECRET`)
+- A GCP project with a service account key (BigQuery + GCS permissions)
+- Terraform ≥ 1.5
 
-> [!IMPORTANT]  
-> To evaluate the projects, we'll use peer reviewing. This is a great opportunity for you to learn from each other.
->
-> - To get points for your project, you need to evaluate 3 projects of your peers
-> - You get 3 extra points for each evaluation
+### 1 — Clone & Configure
 
-## Evaluation Criteria
+```bash
+git clone <repo-url>
+cd French_IT_Job_Market_DE_Project
+```
 
-- Problem description
-  - 0 points: Problem is not described
-  - 2 points: Problem is described but shortly or not clearly 
-  - 4 points: Problem is well described and it's clear what the problem the project solves
-- Cloud
-  - 0 points: Cloud is not used, things run only locally
-  - 2 points: The project is developed in the cloud
-  - 4 points: The project is developed in the cloud and IaC tools are used
-- Data ingestion (choose either batch or stream)
-  - Batch / Workflow orchestration
-    - 0 points: No workflow orchestration
-    - 2 points: Partial workflow orchestration: some steps are orchestrated, some run manually
-    - 4 points: End-to-end pipeline: multiple steps in the DAG, uploading data to data lake
-  - Stream
-    - 0 points: No streaming system (like Kafka, Pulsar, etc)
-    - 2 points: A simple pipeline with one consumer and one producer
-    - 4 points: Using consumer/producers and streaming technologies (like Kafka streaming, Spark streaming, Flink, etc)
-- Data warehouse
-  - 0 points: No DWH is used
-  - 2 points: Tables are created in DWH, but not optimized
-  - 4 points: Tables are partitioned and clustered in a way that makes sense for the upstream queries (with explanation)
-- Transformations (dbt, spark, etc)
-  - 0 points: No tranformations
-  - 2 points: Simple SQL transformation (no dbt or similar tools)
-  - 4 points: Tranformations are defined with dbt, Spark or similar technologies
-- Dashboard
-  - 0 points: No dashboard
-  - 2 points: A dashboard with 1 tile
-  - 4 points: A dashboard with 2 tiles
-- Reproducibility
-  - 0 points: No instructions how to run the code at all
-  - 2 points: Some instructions are there, but they are not complete
-  - 4 points: Instructions are clear, it's easy to run the code, and the code works
+Create a `.env` file:
+```bash
+FT_CLIENT_ID=your_france_travail_client_id
+FT_CLIENT_SECRET=your_france_travail_client_secret
+AIRFLOW_UID=50000
+```
 
-> [!NOTE]
-> It's highly recommended to create a new repository for your project (not inside an existing repo) with a meaningful title, such as
-> "Quake Analytics Dashboard" or "Bike Data Insights" and include as many details as possible in the README file. ChatGPT can assist you with this. Doing so will not only make it easier to showcase your project for potential job opportunities but also have it featured on the [Projects Gallery App](#projects-gallery).
-> If you leave the README file empty or with minimal details, there may be point deductions as per the [Evaluation Criteria](#evaluation-criteria).
+Place your GCP service account JSON at:
+```
+terraform/keys/mycreds.json
+```
 
-## Going the extra mile (Optional)
+### 2 — Provision GCP Infrastructure
 
-> [!NOTE]
-> The following things are not covered in the course, are entirely optional and they will not be graded.
+```bash
+cd terraform
+terraform init
+terraform apply -var="credentials=./keys/mycreds.json"
+cd ..
+```
 
-However, implementing these could significantly enhance the quality of your project:
+This creates:
+- GCS bucket: `french-it-jobs-lake`
+- BigQuery dataset: `french_it_jobs`
 
-- Add tests
-- Use make
-- Add CI/CD pipeline
+### 3 — Start All Services
 
-If you intend to include this project in your portfolio, adding these additional features will definitely help you to stand out from others.
+```bash
+docker compose up -d
+```
 
-## Cheating and plagiarism
+Services started: `postgres`, `kafka`, `kafka-init` (topics), `redis`, `spark-jar-init` (downloads GCS/BQ jars), `spark`, `airflow-init`, `airflow-webserver`, `airflow-scheduler`
 
-Plagiarism in any form is not allowed. Examples of plagiarism:
+Verify everything is healthy:
+```bash
+docker compose ps
+```
 
-- Taking somebody's else notebooks and projects (in full or partly) and using it for the capstone project
-- Re-using your own projects (in full or partly) from other courses and bootcamps
-- Re-using your midterm project from ML Zoomcamp in capstone
-- Re-using your ML Zoomcamp from previous iterations of the course
+### 4 — Run the Day-1 Backfill
 
-Violating any of this will result in 0 points for this project.
+```bash
+docker compose --profile backfill up producer
+```
 
-## Resources
+Expected output (~4,900 offers across 12 ROME codes):
+```
+═════════════════════════════════════════════
+  BACKFILL SUMMARY
+═════════════════════════════════════════════
+  M1805      701 offers
+  M1806      983 offers
+  ...
+  TOTAL        4912 offers
+═════════════════════════════════════════════
+```
 
-### Datasets
+Verify Redis:
+```bash
+docker exec french_it_job_market_de_project-redis-1 redis-cli SCARD active_offer_ids
+# → ~5500
+```
 
-Refer to the provided [datasets](datasets.md) for possible selection.
+### 5 — Start Spark Streaming
 
-### Helpful Links
+```bash
+ docker compose exec \
+   -e ENABLE_CLOUD_SINK=true \
+   -e GCS_KEY_FILE=/opt/spark/work-dir/keys/mycreds.json \
+   spark bash -c "
+     PYTHONPATH=/opt/spark/work-dir/src \
+     /opt/spark/bin/spark-submit \
+       --master 'local[2]' \
+       --driver-memory 1g \
+       --jars /opt/spark/extra-jars/guava-32.1.3-jre.jar,/opt/spark/extra-jars/gcs-connector-hadoop3-2.2.22-shaded.jar,/opt/spark/extra-jars/spark-bigquery-with-dependencies_2.12-0.36.1.jar \
+       --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
+       /opt/spark/work-dir/src/streaming/spark_streaming_job.py
+   "
+```
 
-- [Unit Tests + CI for Airflow](https://www.astronomer.io/events/recaps/testing-airflow-to-bulletproof-your-code/)
-- [CI/CD for Airflow (with Gitlab & GCP state file)](https://engineering.ripple.com/building-ci-cd-with-airflow-gitlab-and-terraform-in-gcp)
-- [CI/CD for Airflow (with GitHub and S3 state file)](https://programmaticponderings.com/2021/12/14/devops-for-dataops-building-a-ci-cd-pipeline-for-apache-airflow-dags/)
-- [CD for Terraform](https://medium.com/towards-data-science/git-actions-terraform-for-data-engineers-scientists-gcp-aws-azure-448dc7c60fcc)
-- [Spark + Airflow](https://medium.com/doubtnut/github-actions-airflow-for-automating-your-spark-pipeline-c9dff32686b)
+Tail logs:
+```bash
+docker exec french_it_job_market_de_project-spark-1 tail -f /tmp/spark_streaming.log
+```
 
-### Projects Gallery
+### 6 — Enable Airflow DAGs
 
-Explore a collection of projects completed by members of our community. The projects cover a wide range of topics and utilize different tools and techniques. Feel free to delve into any project and see how others have tackled real-world problems with data, structured their code, and presented their findings. It's a great resource to learn and get ideas for your own projects.
+Airflow UI: **http://localhost:8081** (login: `admin` / `admin`)
 
-[Streamlit App](https://datatalksclub-projects.streamlit.app/)
+Enable DAGs in this order:
 
-### DE Zoomcamp 2023
+| DAG | Schedule | Purpose |
+|---|---|---|
+| `dag_backfill_initial` | `@once` | Already complete after Step 4 |
+| `dag_cdc_ingest` | Every 10 min | Poll API → publish CDC events |
+| `dag_dbt_transform` | Hourly | Transform staging → marts |
+| `dag_data_quality` | Daily | Automated quality checks |
 
-- [2023 Projects](../cohorts/2023/project.md)
+Trigger the first dbt run manually:
+```bash
+docker exec french_it_job_market_de_project-airflow-scheduler-1 \
+  airflow dags trigger dag_dbt_transform
+```
 
-### DE Zoomcamp 2022
+### 7 — Connect Looker Studio
 
-- [2022 Projects](../cohorts/2022/project.md)
+1. Go to [lookerstudio.google.com](https://lookerstudio.google.com)
+2. **Add data source → BigQuery → `french_it_jobs` dataset**
+3. Connect the five `mart_*` reporting tables as separate data sources
+4. Build dashboards using the mart tables (see [Dashboard Guide](#-dashboard-guide) below)
 
+---
+
+## 📊 Data Model
+
+### Staging Layer
+
+| Table | Description |
+|---|---|
+| `stg_job_offers` | Raw offers written by Spark from Kafka |
+| `stg_job_skills` | Skills extracted per offer |
+| `stg_offer_expirations` | EXPIRE CDC events |
+
+### Star Schema (Marts)
+
+| Table | Grain | Description |
+|---|---|---|
+| `dim_date` | 1 row/calendar date | Calendar dimension |
+| `dim_location` | 1 row/commune+postal | Location hierarchy |
+| `dim_company` | 1 row/company | Employer attributes |
+| `dim_rome` | 1 row/ROME code | Occupation classification |
+| `fact_job_offers` | 1 row/offer | Central fact (CDC lifecycle) |
+| `fact_job_skills` | 1 row/offer+skill | Skill bridge table |
+
+### Reporting Marts
+
+| Mart | Powers |
+|---|---|
+| `mart_salary_analysis` | Salary distributions by experience, region, ROME, contract |
+| `mart_skill_demand` | Top skills overall, by region, by ROME, by contract |
+| `mart_geographical_overview` | Job density by region, department, commune |
+| `mart_offer_lifecycle` | Avg/median time-to-fill by ROME, contract, region |
+| `mart_contract_type_distribution` | CDI/CDD/Interim breakdown by ROME |
+
+---
+
+## 📈 Dashboard Guide
+
+[**👉 View Live Dashboard**](https://datastudio.google.com/reporting/259bf2a2-5ba2-4e3b-b1dd-62e7d67bae26)
+
+The Looker Studio dashboard has 4 pages:
+
+**Page 1 — Market Overview & Geography** (`mart_geographical_overview`)
+- KPI scorecards: total active offers, total all-time
+- Google Maps bubble chart by department (set `dept_name` field type to **Geo → Region**)
+- Top regions bar chart
+
+**Page 2 — Skill Demand** (`mart_skill_demand`)
+- Top 15 skills stacked bar (Required vs Desired)
+- Skills × ROME pivot table (filter `analysis_type = 'by_rome'`)
+
+**Page 3 — Salaries & Contracts** (`mart_salary_analysis` + `mart_contract_type_distribution`)
+- Median annual salary by experience group
+- Salary table: ROME × experience
+- Contract distribution donut chart
+
+**Page 4 — Market Dynamics** (`mart_offer_lifecycle`)
+- Median time-to-fill by ROME code
+- Fastest/slowest filling roles table
+
+---
+
+## 🔍 Monitoring & Quality
+
+### Health Checks
+
+```bash
+# All services running?
+docker compose ps
+
+# Redis state
+docker exec french_it_job_market_de_project-redis-1 redis-cli SCARD active_offer_ids
+
+# Spark logs
+docker exec french_it_job_market_de_project-spark-1 tail -50 /tmp/spark_streaming.log
+
+# Airflow recent DAG runs
+docker exec french_it_job_market_de_project-airflow-scheduler-1 \
+  airflow dags list-runs --dag-id dag_cdc_ingest -o table
+```
+
+### Daily Data Quality Checks (`dag_data_quality`)
+
+| Check | Threshold |
+|---|---|
+| Volume | `stg_job_offers` ≥ 100 rows |
+| NULL rate | Critical columns < 5% NULL in `fact_job_offers` |
+| Duplicates | Zero duplicate `offer_id` in `fact_job_offers` |
+| EXPIRE anomaly | Expired rate < 10% of total (guards against Redis state corruption) |
+
+### dbt Tests
+
+Run manually:
+```bash
+docker exec french_it_job_market_de_project-airflow-scheduler-1 \
+  bash -c "cd /opt/airflow/dbt && dbt test --project-dir /opt/airflow/dbt --profiles-dir /opt/airflow/dbt"
+```
+
+Tests cover: `not_null`, `unique`, `accepted_values`, and `relationships` (FK integrity) across all dimension, fact, and mart models.
+
+---
+
+## 🌍 ROME Codes Covered
+
+| Code | Domain |
+|---|---|
+| M1801 | Administrateur / Administratrice réseau informatique |
+| M1802 | Ingénieur / Ingénieure système informatique |
+| M1803 | Directeur / Directrice des services informatiques -DSI- |
+| M1804 | Ingénieur / Ingénieure télécoms |
+| M1805 | Développeur / Développeuse web |
+| M1806 | Consultant / Consultant(e) en informatique |
+| M1810 | Technicien / Technicienne informatique |
+| M1811 | Data Engineer |
+| M1812 | Responsable de la Sécurité des Systèmes d'Information (RSSI) |
+| M1813 | Intégrateur / Intégratrice logiciels métiers |
+| M1405 | Data scientist |
+| E1206 | UI - UX Designer |
+
+---
+
+## ⚙️ Environment Variables
+
+| Variable | Where set | Description |
+|---|---|---|
+| `FT_CLIENT_ID` | `.env` | France Travail API client ID |
+| `FT_CLIENT_SECRET` | `.env` | France Travail API client secret |
+| `AIRFLOW_UID` | `.env` | UID for Airflow containers (use `id -u`) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | docker-compose | Path to GCP service account JSON |
+| `ENABLE_CLOUD_SINK` | spark-submit env | Set `true` to write to GCS + BigQuery |
+| `KAFKA_BOOTSTRAP` | docker-compose | Kafka broker address |
+| `REDIS_HOST` / `REDIS_PORT` | docker-compose | Redis connection |
+
+---

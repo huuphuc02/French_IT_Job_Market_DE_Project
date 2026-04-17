@@ -44,9 +44,9 @@ joined as (
         s.exigence_level,
         s.extraction_source,
 
-        dl.location_key,
-        dc.company_key,
-        dr.rome_key,
+        {{ dbt_utils.generate_surrogate_key(["coalesce(l.commune_name, '')", "coalesce(l.code_postal, '')"]) }} as location_key,
+        {{ dbt_utils.generate_surrogate_key(["coalesce(l.company_name, '')", "coalesce(l.naf_code, '')", "coalesce(l.sector_code, '')"]) }} as company_key,
+        {{ dbt_utils.generate_surrogate_key(["coalesce(l.rome_code, '')"]) }} as rome_key,
 
         dc_date.date_day as date_key_created,
         de_date.date_day as date_key_expired
@@ -55,19 +55,7 @@ joined as (
     inner join lifecycle l
         on l.offer_id = s.offer_id
 
-    left join {{ ref('dim_location') }} dl
-        on dl.dept_code = l.dept_code
-       and dl.commune_code = l.commune_code
-       and dl.code_postal = l.code_postal
-       and dl.commune_name = l.commune_name
 
-    left join {{ ref('dim_company') }} dc
-        on dc.company_name = l.company_name
-       and dc.naf_code = l.naf_code
-       and dc.sector_code = l.sector_code
-
-    left join {{ ref('dim_rome') }} dr
-        on dr.rome_code = l.rome_code
 
     left join dim_dates dc_date
         on l.date_created is not null

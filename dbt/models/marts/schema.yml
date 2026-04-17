@@ -1,74 +1,100 @@
 version: 2
 
 models:
+
+  # ── Dimension Tables ────────────────────────────────────────────────────────
+
   - name: dim_date
     description: >
       Calendar dimension built from offer lifecycle dates (created, updated, expired).
     columns:
       - name: date_day
-        description: Calendar date (DATE).
+        description: Calendar date (DATE grain, PK).
         data_tests:
           - not_null
           - unique
 
       - name: year
-        description: Calendar year.
+        description: Calendar year (e.g. 2026).
+        data_tests:
+          - not_null
 
       - name: quarter
         description: Calendar quarter (1–4).
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4]
+              quote: false
 
       - name: month
         description: Month of year (1–12).
+        data_tests:
+          - not_null
 
       - name: month_name
-        description: Full month name (English).
+        description: Full month name in English (e.g. January).
+        data_tests:
+          - not_null
 
       - name: week_of_year
-        description: ISO week of year.
+        description: ISO week of year (0–53).
+        data_tests:
+          - not_null
 
       - name: day_of_month
         description: Day of month (1–31).
+        data_tests:
+          - not_null
 
       - name: day_of_week
-        description: Day of week (BigQuery DAYOFWEEK semantics).
+        description: Day of week — BigQuery DAYOFWEEK (1=Sunday … 7=Saturday).
+        data_tests:
+          - not_null
 
       - name: day_name
-        description: Weekday name (English).
+        description: Weekday name in English (e.g. Monday).
+        data_tests:
+          - not_null
 
       - name: is_weekend
-        description: True for Sat/Sun per BigQuery DAYOFWEEK mapping.
+        description: TRUE for Saturday (7) or Sunday (1) per BigQuery DAYOFWEEK.
+        data_tests:
+          - not_null
 
   - name: dim_location
     description: >
-      Location dimension: department, commune, postal, coordinates, optional department/region from seed.
+      Location dimension: department, commune, postal code, coordinates,
+      and department/region names enriched from the dept_region seed.
     columns:
       - name: location_key
-        description: Surrogate key for the location grain.
+        description: Surrogate key (hash of commune_name + code_postal).
         data_tests:
           - not_null
           - unique
-
-      - name: dept_code
-        description: French department code.
-
-      - name: dept_name
-        description: Department name from dept_region seed.
-
-      - name: region_name
-        description: Region name from dept_region seed.
 
       - name: commune_code
         description: INSEE commune code.
 
       - name: commune_name
-        description: Commune name.
+        description: Commune / city name.
 
       - name: code_postal
-        description: Postal code.
+        description: French postal code.
+
+      - name: dept_code
+        description: Department number (e.g. "75", "67").
+
+      - name: dept_name
+        description: Department name from dept_region seed (e.g. "Paris").
+
+      - name: region_name
+        description: Region name from dept_region seed (e.g. "Ile-de-France").
 
   - name: dim_company
     description: >
-      Company / employer dimension derived from distinct lifecycle offer attributes.
+      Company / employer dimension derived from distinct offer attributes.
+      One row per unique (company_name, naf_code, sector_code) triple.
     columns:
       - name: company_key
         description: Surrogate key for company grain.
@@ -82,32 +108,323 @@ models:
           - not_null
 
       - name: company_size
-        description: Establishment size band.
+        description: Establishment size band (e.g. "100 a 199 salaries").
 
       - name: naf_code
-        description: NAF activity code.
+        description: NAF activity code (e.g. "62.03Z").
 
       - name: sector_code
-        description: Sector activity code.
+        description: Sector activity code (e.g. "62").
 
       - name: sector_label
         description: Sector activity label.
 
   - name: dim_rome
     description: >
-      ROME occupation dimension.
+      ROME occupation dimension. One row per unique ROME code.
     columns:
       - name: rome_key
-        description: Surrogate key for ROME code.
+        description: Surrogate key (hash of rome_code).
         data_tests:
           - not_null
           - unique
 
       - name: rome_code
-        description: ROME occupational code.
+        description: ROME occupational code (e.g. "M1805").
         data_tests:
           - not_null
           - unique
 
       - name: rome_label
-        description: ROME label.
+        description: ROME occupational label.
+        data_tests:
+          - not_null
+
+  # ── Fact Tables ─────────────────────────────────────────────────────────────
+
+  - name: fact_job_offers
+    description: >
+      Central fact table: one row per unique job offer.
+      Includes CDC lifecycle fields (is_active, date_expired, offer_lifetime_days)
+      and FK references to all dimension tables.
+    columns:
+      - name: offer_id
+        description: France Travail offer ID (PK).
+        data_tests:
+          - not_null
+          - unique
+
+      - name: date_key_created
+        description: FK to dim_date (offer creation date).
+        data_tests:
+          - relationships:
+              to: ref('dim_date')
+              field: date_day
+
+      - name: date_key_updated
+        description: FK to dim_date (offer last update date).
+
+      - name: date_key_expired
+        description: FK to dim_date (offer expiry date, NULL if still active).
+
+      - name: location_key
+        description: FK to dim_location.
+        data_tests:
+          - relationships:
+              to: ref('dim_location')
+              field: location_key
+
+      - name: company_key
+        description: FK to dim_company.
+        data_tests:
+          - relationships:
+              to: ref('dim_company')
+              field: company_key
+
+      - name: rome_key
+        description: FK to dim_rome.
+        data_tests:
+          - relationships:
+              to: ref('dim_rome')
+              field: rome_key
+
+      - name: is_active
+        description: TRUE while offer is active; FALSE after EXPIRE CDC event.
+        data_tests:
+          - not_null
+
+      - name: date_created
+        description: Original offer creation timestamp.
+
+      - name: date_updated
+        description: Offer last update timestamp.
+
+      - name: date_expired
+        description: Timestamp when EXPIRE event was received (NULL if active).
+
+      - name: offer_lifetime_days
+        description: Days between date_created and date_expired (NULL if still active).
+
+      - name: contract_type
+        description: Human-readable contract type (CDI, CDD, Interim, Liberal, etc.).
+        data_tests:
+          - not_null
+
+      - name: contract_type_label
+        description: Full contract type label from the API.
+
+      - name: is_alternance
+        description: Whether the offer is an apprenticeship/alternance.
+        data_tests:
+          - not_null
+
+      - name: experience_required
+        description: Experience requirement code mapped to label (Required / Desired / Beginner accepted).
+        data_tests:
+          - accepted_values:
+              values: ["Required", "Beginner accepted", "Desired", ""]
+
+      - name: experience_label
+        description: Human-readable experience duration (e.g. "3 An(s)", "0 An(s)").
+
+      - name: experience_group
+        description: Grouped experience bucket (Entry Level, Junior, Mid-Level, Experienced, Senior, Not Specified).
+        data_tests:
+          - accepted_values:
+              values:
+                - "Entry Level (0-6 months)"
+                - "Junior (6-18 months)"
+                - "Mid-Level (2-3 years)"
+                - "Experienced (3-5 years)"
+                - "Senior (5+ years)"
+                - "Not Specified"
+
+      - name: qualification_label
+        description: Qualification label (Cadre, Technicien, etc.).
+
+      - name: salary_min_annual
+        description: Parsed minimum annual salary in EUR.
+
+      - name: salary_max_annual
+        description: Parsed maximum annual salary in EUR.
+
+      - name: salary_text
+        description: Raw salary text from the API.
+
+      - name: num_positions
+        description: Number of open positions.
+
+  - name: fact_job_skills
+    description: >
+      Bridge / fact table linking job offers to extracted skills.
+      One row per (offer_id, skill_label) pair.
+    columns:
+      - name: offer_id
+        description: FK to fact_job_offers.
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('fact_job_offers')
+              field: offer_id
+
+      - name: skill_label
+        description: Canonical skill label (e.g. "Python", "Docker").
+        data_tests:
+          - not_null
+
+      - name: exigence_level
+        description: Skill requirement level — E (required) or S (desired).
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["E", "S"]
+
+      - name: extraction_source
+        description: How the skill was found — api_competences or description_regex.
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["api_competences", "description_regex"]
+
+      - name: location_key
+        description: FK to dim_location (denormalised for Looker Studio convenience).
+
+      - name: rome_key
+        description: FK to dim_rome (denormalised for Looker Studio convenience).
+
+      - name: company_key
+        description: FK to dim_company (denormalised for Looker Studio convenience).
+
+  # ── Reporting Marts ─────────────────────────────────────────────────────────
+
+  - name: mart_salary_analysis
+    description: >
+      Multi-dimensional salary analysis table.
+      Each row represents salary statistics for one analysis_type slice
+      (region, experience_group, contract, rome_experience, rome, skill).
+    columns:
+      - name: analysis_type
+        description: Slice identifier (region / experience / contract / rome_experience / rome / skill).
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["region", "experience", "contract", "rome_experience", "rome", "skill"]
+
+      - name: offer_count
+        description: Number of offers with salary data in this slice.
+        data_tests:
+          - not_null
+
+      - name: avg_salary_annual
+        description: Mean annual salary (EUR) across offers in this slice.
+
+      - name: min_salary_annual
+        description: Minimum annual salary (EUR) in this slice.
+
+      - name: max_salary_annual
+        description: Maximum annual salary (EUR) in this slice.
+
+      - name: median_salary_annual
+        description: Approximate median annual salary (EUR) via APPROX_QUANTILES.
+
+  - name: mart_skill_demand
+    description: >
+      Skill demand counts across multiple breakdown dimensions.
+      Each row is one (skill_label, exigence_level, analysis_type) aggregation.
+    columns:
+      - name: skill_label
+        description: Canonical skill name.
+        data_tests:
+          - not_null
+
+      - name: exigence_level
+        description: E (required) or S (desired).
+        data_tests:
+          - not_null
+
+      - name: analysis_type
+        description: Breakdown type (overall / active_only / by_rome / by_contract).
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["overall", "active_only", "by_rome", "by_contract"]
+
+      - name: offer_count
+        description: Number of distinct offers mentioning this skill in this slice.
+        data_tests:
+          - not_null
+
+  - name: mart_geographical_overview
+    description: >
+      Job posting counts by geographic aggregation level (region, department, commune).
+    columns:
+      - name: aggregation_level
+        description: Geographic granularity — region, department, or commune.
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["region", "department", "commune"]
+
+      - name: total_offers
+        description: Total offers in this geographic slice.
+        data_tests:
+          - not_null
+
+      - name: active_offers
+        description: Offers where is_active = TRUE.
+        data_tests:
+          - not_null
+
+  - name: mart_contract_type_distribution
+    description: >
+      Contract type breakdown (CDI, CDD, Interim, etc.) across overall,
+      by ROME code, and by ROME × alternance status.
+    columns:
+      - name: aggregation_level
+        description: Slice type — overall / rome / rome_alternance.
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["overall", "rome", "rome_alternance"]
+
+      - name: contract_type
+        description: Contract type code (CDI, CDD, Interim, Liberal, etc.).
+
+      - name: total_offers
+        description: Total offers in this slice.
+        data_tests:
+          - not_null
+
+      - name: active_offers
+        description: Offers where is_active = TRUE in this slice.
+        data_tests:
+          - not_null
+
+  - name: mart_offer_lifecycle
+    description: >
+      Average and median time-to-fill (offer lifetime in days) for expired offers,
+      broken down by ROME × contract type, ROME only, and region.
+    columns:
+      - name: analysis_type
+        description: Slice identifier (by_rome_contract / by_rome / by_region).
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["by_rome_contract", "by_rome", "by_region"]
+
+      - name: total_expired_offers
+        description: Number of offers with a measured lifetime in this slice.
+        data_tests:
+          - not_null
+
+      - name: avg_lifetime_days
+        description: Mean offer lifetime in days.
+
+      - name: min_lifetime_days
+        description: Minimum offer lifetime in days.
+
+      - name: max_lifetime_days
+        description: Maximum offer lifetime in days.
+
+      - name: median_lifetime_days
+        description: Approximate median offer lifetime (days) via APPROX_QUANTILES.

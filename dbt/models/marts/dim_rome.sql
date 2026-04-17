@@ -2,10 +2,11 @@
 
 with base as (
 
-    select distinct
+    select 
         rome_code,
-        rome_label
+        max(rome_label) as rome_label
     from {{ ref('int_offer_lifecycle') }}
+    group by rome_code
 
 ),
 

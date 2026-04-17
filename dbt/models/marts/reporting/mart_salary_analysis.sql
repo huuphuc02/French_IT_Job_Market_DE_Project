@@ -4,8 +4,7 @@ with offers as (
     select 
         f.offer_id,
         f.contract_type,
-        f.experience_required,
-        f.experience_label,
+        f.experience_group,
         case 
             when f.salary_min_annual is not null and f.salary_max_annual is not null
                 then (f.salary_min_annual + f.salary_max_annual) / 2.0
@@ -42,8 +41,7 @@ agg_region as (
         region_name,
         dept_name,
         dept_code,
-        cast(null as string)  as experience_label,
-        cast(null as string)   as experience_required,
+        cast(null as string)  as experience_group,
         cast(null as string)  as contract_type,
         cast(null as string)  as rome_code,
         cast(null as string)  as rome_label,
@@ -65,8 +63,7 @@ agg_experience as (
         cast(null as string)  as region_name,
         cast(null as string)  as dept_name,
         cast(null as string)  as dept_code,
-        experience_label,
-        experience_required,
+        experience_group,
         cast(null as string)  as contract_type,
         cast(null as string)  as rome_code,
         cast(null as string)  as rome_label,
@@ -77,7 +74,7 @@ agg_experience as (
         max(salary_annual_mid)                             as max_salary_annual,
         APPROX_QUANTILES(salary_annual_mid, 4)[OFFSET(2)]  as median_salary_annual
     from joined
-    group by experience_required, experience_label
+    group by experience_group
     having count(*) > 10
 ),
 
@@ -88,8 +85,7 @@ agg_contract as (
         cast(null as string)  as region_name,
         cast(null as string)  as dept_name,
         cast(null as string)  as dept_code,
-        cast(null as string)  as experience_label,
-        cast(null as string)   as experience_required,
+        cast(null as string)  as experience_group,
         contract_type,
         cast(null as string)  as rome_code,
         cast(null as string)  as rome_label,
@@ -104,18 +100,17 @@ agg_contract as (
     having count(*) > 10
 ),
 
--- 4) Salary by region × contract type (cross-cut worth keeping)
-agg_region_contract as (
+-- 4) Salary by rome x experience group
+agg_rome_experience as (
     select
-        'region_contract' as analysis_type,
-        region_name,
+        'rome_experience' as analysis_type,
+        cast(null as string)  as region_name,
         cast(null as string)  as dept_name,
         cast(null as string)  as dept_code,
-        cast(null as string)  as experience_label,
-        cast(null as string)   as experience_required,
-        contract_type,
-        cast(null as string)  as rome_code,
-        cast(null as string)  as rome_label,
+        experience_group,
+        cast(null as string)  as contract_type,
+        rome_code,
+        rome_label,
         cast(null as string)  as skill_label,
         count(*)                                           as offer_count,
         avg(salary_annual_mid)                             as avg_salary_annual,
@@ -123,7 +118,7 @@ agg_region_contract as (
         max(salary_annual_mid)                             as max_salary_annual,
         APPROX_QUANTILES(salary_annual_mid, 4)[OFFSET(2)]  as median_salary_annual
     from joined
-    group by region_name, contract_type
+    group by experience_group, rome_code, rome_label
     having count(*) > 10
 ),
 
@@ -134,8 +129,7 @@ agg_rome as (
         cast(null as string)  as region_name,
         cast(null as string)  as dept_name,
         cast(null as string)  as dept_code,
-        cast(null as string)  as experience_label,
-        cast(null as string)   as experience_required,
+        cast(null as string)  as experience_group,
         cast(null as string)  as contract_type,
         rome_code,
         rome_label,
@@ -157,8 +151,7 @@ agg_skill as (
         cast(null as string)  as region_name,
         cast(null as string)  as dept_name,
         cast(null as string)  as dept_code,
-        cast(null as string)  as experience_label,
-        cast(null as string)   as experience_required,
+        cast(null as string)  as experience_group,
         cast(null as string)  as contract_type,
         cast(null as string)  as rome_code,
         cast(null as string)  as rome_label,
@@ -180,7 +173,7 @@ select * from agg_experience
 union all
 select * from agg_contract
 union all
-select * from agg_region_contract
+select * from agg_rome_experience
 union all
 select * from agg_rome
 union all
