@@ -2,7 +2,7 @@
 
 A production-grade data engineering pipeline that ingests, processes, and analyses **French IT job offers** from the [France Travail (Pôle Emploi) API](https://francetravail.io/data/api/offres-emploi) in real time.
 
-It combines **Kafka streaming**, **Spark Structured Streaming**, **Change-Data-Capture (CDC)**, **dbt transformations on BigQuery**, and a **Looker Studio dashboard** — all orchestrated by **Apache Airflow** and provisioned with **Terraform**.
+It combines **Kafka streaming**, **Spark Structured Streaming**, **Change-Data-Capture (CDC)**, **dbt transformations on BigQuery**, and a [**Looker Studio dashboard**](https://datastudio.google.com/reporting/259bf2a2-5ba2-4e3b-b1dd-62e7d67bae26) — all orchestrated by **Apache Airflow** and provisioned with **Terraform**.
 
 ---
 
@@ -279,6 +279,8 @@ docker exec french_it_job_market_de_project-airflow-scheduler-1 \
 ---
 
 ## 📈 Dashboard Guide
+
+[**👉 View Live Dashboard**](https://datastudio.google.com/reporting/259bf2a2-5ba2-4e3b-b1dd-62e7d67bae26)
 
 The Looker Studio dashboard has 4 pages:
 
